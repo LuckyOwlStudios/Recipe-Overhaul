@@ -44,7 +44,7 @@
 ![A "New Brewing Recipe!" toast after reading a Potion Scroll](media/2026-11-18_14.19.37.png)
 
 - **Crafting:** craft a scroll from **paper + nether wart + glass bottle** (shapeless). The recipe unlocks when you pick up nether wart.
-- **Witch drops:** witches killed by a player drop one 10% of the time, plus 5% per level of Looting.
+- **Witch drops:** witches killed by a player drop one 25% of the time, plus 10% per level of Looting (55% with Looting III).
 - **Using one:** a scroll teaches you a random brewing recipe you don't know yet, and a **New Brewing Recipe!** toast shows the potion.
 - **Using a stack:** sneak while using to read the whole stack at once. You learn one recipe per scroll and get a single summary toast. Once you know every recipe, the leftover scrolls stay in your hand.
 - **No restrictions:** unlocks only fill the book. You can still brew anything without unlocking it, just like vanilla's recipe book.
