@@ -47,6 +47,7 @@ public final class PinRecipeClient {
 
     /** Called after a screen renders. Draws the pinned recipes on the inventory screen only. */
     public static void onScreenRender(Screen screen, net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY) {
+        com.luckyowlstudios.pinrecipe.client.RecipeBookSelection.render(screen, graphics);
         PinnedRecipeOverlay.render(screen, graphics, mouseX, mouseY);
         BrewingRecipeBook.renderForeground(screen, graphics, mouseX, mouseY);
     }

@@ -346,7 +346,7 @@ public final class PinnedRecipeOverlay {
     /** Brewing pins show the ingredient and the base bottle side by side. */
     private static Layout brewingLayout(String pin, BrewingRecipe recipe) {
         List<SlotSpec> slots = List.of(
-                new SlotSpec(List.of(recipe.ingredient()), recipe::ingredientMatches),
+                new SlotSpec(recipe.ingredients(), recipe::ingredientMatches),
                 new SlotSpec(recipe.inputs(), recipe.inputTest()));
         return new Layout(pin, null, recipe, slots, 2, 1, ItemStack.EMPTY, recipe.outputName());
     }

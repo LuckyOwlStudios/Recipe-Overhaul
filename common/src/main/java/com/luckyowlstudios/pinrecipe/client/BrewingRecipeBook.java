@@ -184,7 +184,7 @@ public final class BrewingRecipeBook {
     private static boolean matchesSearch(BrewingRecipe recipe, String query) {
         return recipe.outputName().getString().toLowerCase(Locale.ROOT).contains(query)
                 || recipe.inputName().getString().toLowerCase(Locale.ROOT).contains(query)
-                || recipe.ingredient().getHoverName().getString().toLowerCase(Locale.ROOT).contains(query);
+                || recipe.ingredients().stream().anyMatch(i -> i.getHoverName().getString().toLowerCase(Locale.ROOT).contains(query));
     }
 
     private static List<BrewingRecipe> knownRecipes() {
@@ -247,7 +247,14 @@ public final class BrewingRecipeBook {
                 contents.addPotionTooltip(lines::add, 1.0F, Minecraft.getInstance().level.tickRateManager().tickrate());
             }
             lines.add(Component.translatable("pinrecipe.brewing.base", hovered.inputName()).withStyle(ChatFormatting.GRAY));
-            lines.add(Component.translatable("pinrecipe.brewing.ingredient", hovered.ingredient().getHoverName()).withStyle(ChatFormatting.GRAY));
+            if (hovered.ingredients().size() == 1) {
+                lines.add(Component.translatable("pinrecipe.brewing.ingredient", hovered.ingredient().getHoverName()).withStyle(ChatFormatting.GRAY));
+            } else {
+                lines.add(Component.translatable("pinrecipe.brewing.ingredient_any").withStyle(ChatFormatting.GRAY));
+                for (ItemStack option : hovered.ingredients()) {
+                    lines.add(Component.literal("  ").append(option.getHoverName()).withStyle(ChatFormatting.DARK_GRAY));
+                }
+            }
             lines.add(Component.translatable("pinrecipe.brewing.click_fill").withStyle(ChatFormatting.DARK_GRAY));
             boolean pinned = PinnedRecipes.isPinned(PinnedRecipes.brewingPin(hovered.key()));
             if (!PinRecipeClient.PIN_KEY.isUnbound()) {

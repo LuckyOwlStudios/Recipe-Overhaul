@@ -1,0 +1,23 @@
+{
+  "parent": "minecraft:nether/brew_potion",
+  "display": {
+    "icon": {
+      "id": "pinrecipe:potion_scroll"
+    },
+    "title": {
+      "translate": "advancements.pinrecipe.learn_all_brewing.title"
+    },
+    "description": {
+      "translate": "advancements.pinrecipe.learn_all_brewing.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "learned_all": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}
