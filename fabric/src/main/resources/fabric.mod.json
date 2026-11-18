@@ -11,10 +11,10 @@
     "environment": "*",
     "entrypoints": {
         "main": [
-            "com.luckyowlstudios.pinrecipe.PinRecipeFabric"
+            "com.luckyowlstudios.codex.CodexFabric"
         ],
         "client": [
-            "com.luckyowlstudios.pinrecipe.PinRecipeFabricClient"
+            "com.luckyowlstudios.codex.CodexFabricClient"
         ]
     },
     "mixins": [

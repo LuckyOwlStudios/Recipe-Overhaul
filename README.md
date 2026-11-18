@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="media/codex_logo.png" alt="Recipe Codex logo" width="128">
+  <img src="media/codex_logo.png" alt="Codex logo" width="128">
 </p>
 
-<h1 align="center">Recipe Codex</h1>
+<h1 align="center">Codex</h1>
 
 <p align="center">
   Pin recipes beside your inventory, click them to fill the grid, and get a full recipe book for the brewing stand.<br>
@@ -24,7 +24,7 @@
 - **Look up missing ingredients.** Click a red ingredient on a pin, or a ghost item in the crafting grid, to pin that ingredient's recipe too. For slots like "any planks" it picks the kind you already have.
 - **Shows your selection.** The recipe you clicked in the vanilla recipe book gets a gold outline, the same as in the brewing book.
 - Up to 4 pins at once. Pinning a 5th drops the oldest.
-- Pins are saved to `config/pinrecipe.json`, so they stay after a restart.
+- Pins are saved to `config/codex.json`, so they stay after a restart. (Pins saved by the old Pin Recipe version are picked up too.)
 - On small screens the pins switch to a narrower layout, and they hide while the recipe book needs the space.
 
 ### Brewing stand recipe book
@@ -56,7 +56,7 @@
 
 | Action | Default |
 | --- | --- |
-| Pin or unpin the hovered recipe | **B** (rebind in Options → Controls → Key Binds → Pin Recipe; a mouse button works too) |
+| Pin or unpin the hovered recipe | **B** (rebind in Options → Controls → Key Binds → Codex; a mouse button works too) |
 | Fill a pinned recipe | Click the pin |
 | Fill as many as you can | Shift-click the pin |
 | Pin a missing ingredient's recipe | Click the red slot or ghost item |
