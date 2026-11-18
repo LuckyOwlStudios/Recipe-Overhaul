@@ -8,10 +8,13 @@
         "${mod_author}"
     ],
     "license": "${license}",
-    "environment": "client",
+    "environment": "*",
     "entrypoints": {
-        "client": [
+        "main": [
             "com.luckyowlstudios.pinrecipe.PinRecipeFabric"
+        ],
+        "client": [
+            "com.luckyowlstudios.pinrecipe.PinRecipeFabricClient"
         ]
     },
     "mixins": [

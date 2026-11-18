@@ -9,6 +9,9 @@ public interface AbstractContainerScreenAccessor {
     @Accessor("leftPos")
     int pinrecipe$getLeftPos();
 
+    @Accessor("leftPos")
+    void pinrecipe$setLeftPos(int leftPos);
+
     @Accessor("topPos")
     int pinrecipe$getTopPos();
 

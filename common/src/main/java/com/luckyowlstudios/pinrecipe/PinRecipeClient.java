@@ -1,5 +1,6 @@
 package com.luckyowlstudios.pinrecipe;
 
+import com.luckyowlstudios.pinrecipe.client.BrewingRecipeBook;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookComponentAccessor;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookPageAccessor;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -30,12 +31,30 @@ public final class PinRecipeClient {
             KEY_CATEGORY
     );
 
+    @Nullable
+    private static Screen lastInitScreen;
+
     private PinRecipeClient() {
     }
 
     /** Called after a screen renders. Draws the pinned recipes on the inventory screen only. */
     public static void onScreenRender(Screen screen, net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY) {
         PinnedRecipeOverlay.render(screen, graphics, mouseX, mouseY);
+        BrewingRecipeBook.renderForeground(screen, graphics, mouseX, mouseY);
+    }
+
+    /** Called after a screen is initialised, which happens when it opens and again on every resize. */
+    public static void onScreenInit(Screen screen) {
+        if (screen != lastInitScreen) {
+            lastInitScreen = screen;
+            BrewingRecipeBook.onScreenOpened();
+        }
+        BrewingRecipeBook.onScreenInit(screen);
+    }
+
+    /** Returns true if the release was used and the screen should not see it. */
+    public static boolean onMouseReleased(Screen screen, double mouseX, double mouseY, int button) {
+        return BrewingRecipeBook.mouseReleased(screen, mouseX, mouseY, button);
     }
 
     /** Returns true if the key press was used and the screen should not see it. */
@@ -49,6 +68,9 @@ public final class PinRecipeClient {
     /** Returns true if the click was used and the screen should not see it. */
     public static boolean onMouseClicked(Screen screen, double mouseX, double mouseY, int button) {
         if (PinnedRecipeOverlay.mouseClicked(screen, mouseX, mouseY, button)) {
+            return true;
+        }
+        if (BrewingRecipeBook.mouseClicked(screen, mouseX, mouseY, button)) {
             return true;
         }
         if (!PIN_KEY.isUnbound() && PIN_KEY.matchesMouse(button)) {

@@ -1,6 +1,7 @@
 # Pin Recipe
 
-A client-side Minecraft 1.21.1 mod for **Fabric** and **NeoForge** that lets you pin recipes from the vanilla recipe book.
+A Minecraft 1.21.1 mod for **Fabric** and **NeoForge** that lets you pin recipes from the vanilla recipe book,
+and adds a recipe book to the brewing stand that you fill by reading Potion Scrolls.
 Pinned recipes show up beside your inventory whenever it's open, and never on the in-game HUD.
 
 ## How to use
@@ -18,7 +19,25 @@ Pinned recipes show up beside your inventory whenever it's open, and never on th
   the pins hide until you close the book, so they never cover it.
 - Only the survival inventory and the crafting table show pins; the creative inventory doesn't have a recipe book.
 
-The mod is client-only: servers don't need it.
+## Brewing recipe book
+
+- Open a brewing stand and click the green book button on the right to open the brewing recipe book.
+- It lists every brewing recipe you've unlocked: potions, their Long and II versions, splash and lingering
+  conversions, and brewing recipes added by other mods.
+- Hover a recipe to see its base bottle, ingredient and effects. Recipes you have the items for get a grey
+  background; ones you're missing items for get a red one.
+- Click a recipe to show its bottles and ingredient as faded "ghost" items in the stand's empty slots.
+  Click it again to hide them.
+
+### Potion Scroll
+
+- Craft one from **paper + nether wart + glass bottle** (shapeless). The recipe unlocks once you pick up nether wart.
+- Use it to learn a random brewing recipe you don't know yet. It's used up, unless you already know every recipe.
+- Unlocks only fill the book: you can still brew anything without unlocking it, like vanilla's recipe book.
+- Unlocks are saved per player and kept through death.
+- Operators can use `/brewbook unlockall` and `/brewbook reset` to test.
+
+The mod must be installed on both the server and the client, because it adds an item.
 
 ## Building
 

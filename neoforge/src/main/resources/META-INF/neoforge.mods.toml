@@ -9,8 +9,6 @@ displayName = "${mod_name}"
 credits = "${credits}"
 authors = "${mod_author}"
 description = '''${description}'''
-# Client-only mod: servers don't need it installed.
-displayTest = "IGNORE_ALL_VERSION"
 
 [[mixins]]
 config = "${mod_id}.mixins.json"
@@ -20,11 +18,11 @@ modId = "neoforge"
 type = "required"
 versionRange = "[${neoforge_version},)"
 ordering = "NONE"
-side = "CLIENT"
+side = "BOTH"
 
 [[dependencies.${mod_id}]]
 modId = "minecraft"
 type = "required"
 versionRange = "${minecraft_version_range}"
 ordering = "NONE"
-side = "CLIENT"
+side = "BOTH"
