@@ -4,6 +4,7 @@ import com.luckyowlstudios.codex.brewing.BrewingKnowledge;
 import com.luckyowlstudios.codex.item.ModItems;
 import com.luckyowlstudios.codex.network.SyncKnownBrewsPayload;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.object.builder.v1.trade.TradeOfferHelper;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.loot.v3.LootTableEvents;
@@ -27,7 +28,16 @@ public class CodexFabric implements ModInitializer {
                 ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, ModItems.POTION_SCROLL_NAME),
                 ModItems.createPotionScroll());
         ModItems.POTION_SCROLL = () -> scroll;
-        ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(entries -> entries.accept(scroll));
+        Item tradedScroll = Registry.register(BuiltInRegistries.ITEM,
+                ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, ModItems.TRADED_POTION_SCROLL_NAME),
+                ModItems.createTradedPotionScroll());
+        ModItems.TRADED_POTION_SCROLL = () -> tradedScroll;
+        ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(entries -> {
+            entries.accept(scroll);
+            entries.accept(tradedScroll);
+        });
+        // Level 1 is the wandering trader's common pool (level 2 is its single rare slot).
+        TradeOfferHelper.registerWanderingTraderOffers(1, offers -> offers.add((trader, random) -> ModItems.wanderingTraderOffer()));
 
         LootTableEvents.MODIFY.register((key, tableBuilder, source, registries) -> {
             if (source.isBuiltin() && key.equals(EntityType.WITCH.getDefaultLootTable())) {

@@ -13,6 +13,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.village.WandererTradesEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -22,20 +23,27 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public class CodexNeoForge {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Constants.MOD_ID);
     private static final DeferredItem<Item> POTION_SCROLL = ITEMS.register(ModItems.POTION_SCROLL_NAME, ModItems::createPotionScroll);
+    private static final DeferredItem<Item> TRADED_POTION_SCROLL =
+            ITEMS.register(ModItems.TRADED_POTION_SCROLL_NAME, ModItems::createTradedPotionScroll);
 
     public CodexNeoForge(IEventBus modBus) {
         ITEMS.register(modBus);
         ModItems.POTION_SCROLL = POTION_SCROLL;
+        ModItems.TRADED_POTION_SCROLL = TRADED_POTION_SCROLL;
 
         modBus.addListener(BuildCreativeModeTabContentsEvent.class, event -> {
             if (event.getTabKey() == CreativeModeTabs.FOOD_AND_DRINKS) {
                 event.accept(POTION_SCROLL);
+                event.accept(TRADED_POTION_SCROLL);
             }
         });
 
         modBus.addListener(RegisterPayloadHandlersEvent.class, event -> event.registrar("1")
                 .playToClient(SyncKnownBrewsPayload.TYPE, SyncKnownBrewsPayload.STREAM_CODEC,
                         (payload, context) -> ClientBrewingKnowledge.handle(payload)));
+
+        NeoForge.EVENT_BUS.addListener(WandererTradesEvent.class,
+                event -> event.getGenericTrades().add((trader, random) -> ModItems.wanderingTraderOffer()));
 
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, event -> {
             if (event.getEntity() instanceof ServerPlayer player) {

@@ -12,6 +12,7 @@
   "codex.lookup.pinned": "Pinned the recipe for %s",
   "codex.lookup.unknown": "You don't know a recipe for %s",
   "item.codex.potion_scroll": "Potion Scroll",
+  "item.codex.traded_potion_scroll": "Wanderer's Potion Scroll",
   "item.codex.potion_scroll.tooltip": "Use to learn a random brewing recipe",
   "item.codex.potion_scroll.all_known": "You already know every brewing recipe",
   "codex.brewing.showing_brewable": "Showing Brewable",
