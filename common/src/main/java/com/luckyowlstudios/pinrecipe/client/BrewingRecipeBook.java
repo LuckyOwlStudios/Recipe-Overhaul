@@ -1,5 +1,7 @@
 package com.luckyowlstudios.pinrecipe.client;
 
+import com.luckyowlstudios.pinrecipe.PinRecipeClient;
+import com.luckyowlstudios.pinrecipe.PinnedRecipes;
 import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipe;
 import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipes;
 import com.luckyowlstudios.pinrecipe.brewing.ClientBrewingKnowledge;
@@ -8,6 +10,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.BrewingStandScreen;
 import net.minecraft.client.renderer.RenderType;
@@ -22,9 +25,11 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.alchemy.PotionContents;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A recipe book for the brewing stand, laid out like the vanilla one: a toggle button on the brewing
@@ -57,6 +62,20 @@ public final class BrewingRecipeBook {
     private static final int BOTTLE_SLOTS = 3;
     private static final int INGREDIENT_SLOT = 3;
 
+    private static final ResourceLocation FILTER_ON = ResourceLocation.withDefaultNamespace("recipe_book/filter_enabled");
+    private static final ResourceLocation FILTER_OFF = ResourceLocation.withDefaultNamespace("recipe_book/filter_disabled");
+    private static final ResourceLocation FILTER_ON_HIGHLIGHTED = ResourceLocation.withDefaultNamespace("recipe_book/filter_enabled_highlighted");
+    private static final ResourceLocation FILTER_OFF_HIGHLIGHTED = ResourceLocation.withDefaultNamespace("recipe_book/filter_disabled_highlighted");
+    private static final int FILTER_X = 110;
+    private static final int FILTER_Y = 12;
+    private static final int FILTER_WIDTH = 26;
+    private static final int FILTER_HEIGHT = 16;
+    private static final Component SEARCH_HINT = Component.translatable("gui.recipebook.search_hint")
+            .withStyle(ChatFormatting.ITALIC).withStyle(ChatFormatting.GRAY);
+
+    @Nullable
+    private static EditBox searchBox;
+    private static boolean filterTooltipHovered;
     private static boolean open;
     private static int page;
     @Nullable
@@ -112,6 +131,60 @@ public final class BrewingRecipeBook {
             left += 77;
         }
         access(brewing).pinrecipe$setLeftPos(left);
+
+        String text = searchBox == null ? "" : searchBox.getValue();
+        searchBox = new EditBox(Minecraft.getInstance().font, bookX(screen) + 25, bookY(screen) + 13, 81, 14,
+                Component.translatable("itemGroup.search"));
+        searchBox.setMaxLength(50);
+        searchBox.setTextColor(0xFFFFFF);
+        searchBox.setHint(SEARCH_HINT);
+        searchBox.setValue(text);
+        searchBox.setResponder(value -> page = 0);
+    }
+
+    /** Typing in the search box. Returns true if the key was used (so the screen doesn't close on E). */
+    public static boolean keyPressed(Screen screen, int keyCode, int scanCode, int modifiers) {
+        if (!open || !(screen instanceof BrewingStandScreen) || searchBox == null || !searchBox.isFocused()) {
+            return false;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            return false; // Esc still closes the screen, like the vanilla book.
+        }
+        searchBox.keyPressed(keyCode, scanCode, modifiers);
+        return true;
+    }
+
+    /** Called for each typed character. Returns true if the search box took it. */
+    public static boolean charTyped(char character, int modifiers) {
+        if (!open || !(Minecraft.getInstance().screen instanceof BrewingStandScreen) || searchBox == null || !searchBox.isFocused()) {
+            return false;
+        }
+        searchBox.charTyped(character, modifiers);
+        return true;
+    }
+
+    /** Unlocked recipes, narrowed by the search text and the "show brewable" toggle. */
+    private static List<BrewingRecipe> visibleRecipes(BrewingStandScreen screen) {
+        String query = searchBox == null ? "" : searchBox.getValue().trim().toLowerCase(Locale.ROOT);
+        boolean brewableOnly = PinnedRecipes.isBrewingFilterOn();
+        List<Slot> slots = screen.getMenu().slots;
+        List<BrewingRecipe> visible = new ArrayList<>();
+        for (BrewingRecipe recipe : knownRecipes()) {
+            if (brewableOnly && !canBrew(recipe, slots)) {
+                continue;
+            }
+            if (!query.isEmpty() && !matchesSearch(recipe, query)) {
+                continue;
+            }
+            visible.add(recipe);
+        }
+        return visible;
+    }
+
+    private static boolean matchesSearch(BrewingRecipe recipe, String query) {
+        return recipe.outputName().getString().toLowerCase(Locale.ROOT).contains(query)
+                || recipe.inputName().getString().toLowerCase(Locale.ROOT).contains(query)
+                || recipe.ingredient().getHoverName().getString().toLowerCase(Locale.ROOT).contains(query);
     }
 
     private static List<BrewingRecipe> knownRecipes() {
@@ -126,11 +199,6 @@ public final class BrewingRecipeBook {
             }
         }
         return known;
-    }
-
-    private static int totalCount() {
-        Minecraft mc = Minecraft.getInstance();
-        return mc.level == null ? 0 : BrewingRecipes.all(mc.level).size();
     }
 
     private static int pageCount(int recipes) {
@@ -161,6 +229,10 @@ public final class BrewingRecipeBook {
             renderToggleButton(brewing, graphics, mouseX, mouseY);
             graphics.pose().popPose();
         }
+        if (open && filterTooltipHovered && hovered == null) {
+            graphics.renderTooltip(Minecraft.getInstance().font, Component.translatable(PinnedRecipes.isBrewingFilterOn()
+                    ? "pinrecipe.brewing.showing_brewable" : "gui.recipebook.toggleRecipes.all"), mouseX, mouseY);
+        }
         if (open && hovered != null) {
             Font font = Minecraft.getInstance().font;
             List<Component> lines = new ArrayList<>();
@@ -173,8 +245,12 @@ public final class BrewingRecipeBook {
             }
             lines.add(Component.translatable("pinrecipe.brewing.base", hovered.inputName()).withStyle(ChatFormatting.GRAY));
             lines.add(Component.translatable("pinrecipe.brewing.ingredient", hovered.ingredient().getHoverName()).withStyle(ChatFormatting.GRAY));
-            lines.add(Component.translatable(hovered == selected ? "pinrecipe.brewing.click_hide" : "pinrecipe.brewing.click_show")
-                    .withStyle(ChatFormatting.DARK_GRAY));
+            lines.add(Component.translatable("pinrecipe.brewing.click_fill").withStyle(ChatFormatting.DARK_GRAY));
+            boolean pinned = PinnedRecipes.isPinned(PinnedRecipes.brewingPin(hovered.key()));
+            if (!PinRecipeClient.PIN_KEY.isUnbound()) {
+                lines.add(Component.translatable(pinned ? "pinrecipe.brewing.press_unpin" : "pinrecipe.brewing.press_pin",
+                        PinRecipeClient.PIN_KEY.getTranslatedKeyMessage()).withStyle(ChatFormatting.DARK_GRAY));
+            }
             graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
         }
     }
@@ -194,15 +270,23 @@ public final class BrewingRecipeBook {
         hovered = null;
 
         graphics.blit(BOOK_TEXTURE, x, y, 1, 1, BOOK_WIDTH, BOOK_HEIGHT);
-        // Cover the search icon baked into the vanilla texture; this book has a title instead.
-        graphics.fill(x + 9, y + 10, x + 26, y + 28, 0xFF373737);
 
-        List<BrewingRecipe> recipes = knownRecipes();
-        graphics.drawString(font, Component.translatable("pinrecipe.brewing.title"), x + 11, y + 15, 0xFFFFFF, false);
-        String count = recipes.size() + "/" + totalCount();
-        graphics.drawString(font, count, x + BOOK_WIDTH - 11 - font.width(count), y + 15, 0xA0A0A0, false);
+        // Search box and "show all / show brewable" toggle, in the same spots as the vanilla book.
+        if (searchBox != null) {
+            searchBox.setX(x + 25);
+            searchBox.setY(y + 13);
+            searchBox.render(graphics, mouseX, mouseY, 0);
+        }
+        boolean filterOn = PinnedRecipes.isBrewingFilterOn();
+        boolean filterHovered = inside(mouseX, mouseY, x + FILTER_X, y + FILTER_Y, FILTER_WIDTH, FILTER_HEIGHT);
+        graphics.blitSprite(filterOn
+                        ? (filterHovered ? FILTER_ON_HIGHLIGHTED : FILTER_ON)
+                        : (filterHovered ? FILTER_OFF_HIGHLIGHTED : FILTER_OFF),
+                x + FILTER_X, y + FILTER_Y, FILTER_WIDTH, FILTER_HEIGHT);
+        filterTooltipHovered = filterHovered;
 
-        if (recipes.isEmpty()) {
+        List<BrewingRecipe> recipes = visibleRecipes(screen);
+        if (knownRecipes().isEmpty()) {
             List<FormattedCharSequence> lines = font.split(FormattedText.of(Component.translatable("pinrecipe.brewing.empty").getString()), BOOK_WIDTH - 30);
             int lineY = y + 70;
             for (FormattedCharSequence line : lines) {
@@ -227,6 +311,14 @@ public final class BrewingRecipeBook {
             graphics.renderItem(recipe.currentOutput(), cx + 4, cy + 4);
             if (recipe == selected) {
                 graphics.renderOutline(cx, cy, CELL, CELL, 0xFFFFD700);
+            }
+            if (PinnedRecipes.isPinned(PinnedRecipes.brewingPin(recipe.key()))) {
+                // Small gold pin marker in the corner of pinned recipes.
+                graphics.pose().pushPose();
+                graphics.pose().translate(0, 0, 200);
+                graphics.fill(cx + CELL - 7, cy + 3, cx + CELL - 3, cy + 7, 0xFFFFD700);
+                graphics.fill(cx + CELL - 6, cy + 7, cx + CELL - 4, cy + 10, 0xFFB08800);
+                graphics.pose().popPose();
             }
             if (inside(mouseX, mouseY, cx, cy, CELL, CELL)) {
                 hovered = recipe;
@@ -303,21 +395,35 @@ public final class BrewingRecipeBook {
             return true;
         }
         if (!open || !insideBook(screen, mouseX, mouseY)) {
+            if (searchBox != null) {
+                searchBox.setFocused(false);
+            }
             return false;
         }
         if (button == 0) {
             int x = bookX(screen);
             int y = bookY(screen);
-            List<BrewingRecipe> recipes = knownRecipes();
+            List<BrewingRecipe> recipes = visibleRecipes(brewing);
             int pages = pageCount(recipes.size());
-            if (pages > 1 && page > 0 && inside(mouseX, mouseY, x + 38, y + 137, 12, 17)) {
+            boolean onSearch = searchBox != null && inside(mouseX, mouseY, searchBox.getX(), searchBox.getY(), searchBox.getWidth(), searchBox.getHeight());
+            if (searchBox != null) {
+                searchBox.setFocused(onSearch);
+            }
+            if (onSearch) {
+                searchBox.mouseClicked(mouseX, mouseY, button);
+            } else if (inside(mouseX, mouseY, x + FILTER_X, y + FILTER_Y, FILTER_WIDTH, FILTER_HEIGHT)) {
+                PinnedRecipes.setBrewingFilter(!PinnedRecipes.isBrewingFilterOn());
+                page = 0;
+                playClick();
+            } else if (pages > 1 && page > 0 && inside(mouseX, mouseY, x + 38, y + 137, 12, 17)) {
                 page--;
                 playClick();
             } else if (pages > 1 && page < pages - 1 && inside(mouseX, mouseY, x + 93, y + 137, 12, 17)) {
                 page++;
                 playClick();
             } else if (hovered != null) {
-                selected = hovered == selected ? null : hovered;
+                // Like the vanilla recipe book: move the items in, and show ghosts for anything missing.
+                BrewingFill.fill(brewing, hovered);
                 playClick();
             }
         }
@@ -330,6 +436,25 @@ public final class BrewingRecipeBook {
         }
         return inside(mouseX, mouseY, buttonX(brewing), buttonY(brewing), BUTTON_WIDTH, BUTTON_HEIGHT)
                 || (open && insideBook(screen, mouseX, mouseY));
+    }
+
+    /** The recipe under the mouse in the open book, if any. */
+    @Nullable
+    public static BrewingRecipe hoveredRecipe(Screen screen) {
+        return open && screen instanceof BrewingStandScreen ? hovered : null;
+    }
+
+    /** Shows this recipe's bottles and ingredient as ghost items in the stand's empty slots. */
+    public static void showGhost(BrewingRecipe recipe) {
+        selected = recipe;
+    }
+
+    /** Left edge of the open book beside the stand, or -1 if it isn't open beside it (for the pin overlay). */
+    public static int bookLeftEdge(Screen screen) {
+        if (!open || !(screen instanceof BrewingStandScreen)) {
+            return -1;
+        }
+        return isNarrow(screen) ? 0 : bookX(screen);
     }
 
     /** Clears the ghost recipe when a different brewing stand is opened. */

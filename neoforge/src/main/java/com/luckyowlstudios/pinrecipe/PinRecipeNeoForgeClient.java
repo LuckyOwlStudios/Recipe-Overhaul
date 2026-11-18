@@ -23,7 +23,7 @@ public class PinRecipeNeoForgeClient {
                 PinRecipeClient.onScreenRender(event.getScreen(), event.getGuiGraphics(), event.getMouseX(), event.getMouseY()));
 
         NeoForge.EVENT_BUS.addListener(ScreenEvent.KeyPressed.Pre.class, event -> {
-            if (PinRecipeClient.onKeyPressed(event.getScreen(), event.getKeyCode(), event.getScanCode())) {
+            if (PinRecipeClient.onKeyPressed(event.getScreen(), event.getKeyCode(), event.getScanCode(), event.getModifiers())) {
                 event.setCanceled(true);
             }
         });

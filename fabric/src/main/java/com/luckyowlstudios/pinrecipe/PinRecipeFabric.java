@@ -6,13 +6,18 @@ import com.luckyowlstudios.pinrecipe.network.SyncKnownBrewsPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.loot.v3.LootTableEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.storage.loot.LootPool;
+import net.minecraft.world.level.storage.loot.entries.NestedLootTable;
+import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 
 /** Common (client and server) setup: the Potion Scroll, unlock syncing and the /brewbook command. */
 public class PinRecipeFabric implements ModInitializer {
@@ -23,6 +28,14 @@ public class PinRecipeFabric implements ModInitializer {
                 ModItems.createPotionScroll());
         ModItems.POTION_SCROLL = () -> scroll;
         ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(entries -> entries.accept(scroll));
+
+        LootTableEvents.MODIFY.register((key, tableBuilder, source, registries) -> {
+            if (source.isBuiltin() && key.equals(EntityType.WITCH.getDefaultLootTable())) {
+                tableBuilder.withPool(LootPool.lootPool()
+                        .setRolls(ConstantValue.exactly(1))
+                        .add(NestedLootTable.lootTableReference(ModItems.WITCH_SCROLL_LOOT)));
+            }
+        });
 
         PayloadTypeRegistry.playS2C().register(SyncKnownBrewsPayload.TYPE, SyncKnownBrewsPayload.STREAM_CODEC);
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> BrewingKnowledge.sync(handler.player));

@@ -24,7 +24,7 @@ public class PinRecipeFabricClient implements ClientModInitializer {
             ScreenEvents.afterRender(screen).register((s, graphics, mouseX, mouseY, tickDelta) ->
                     PinRecipeClient.onScreenRender(s, graphics, mouseX, mouseY));
             ScreenKeyboardEvents.allowKeyPress(screen).register((s, key, scancode, modifiers) ->
-                    !PinRecipeClient.onKeyPressed(s, key, scancode));
+                    !PinRecipeClient.onKeyPressed(s, key, scancode, modifiers));
             ScreenMouseEvents.allowMouseClick(screen).register((s, mouseX, mouseY, button) ->
                     !PinRecipeClient.onMouseClicked(s, mouseX, mouseY, button));
             ScreenMouseEvents.allowMouseRelease(screen).register((s, mouseX, mouseY, button) ->

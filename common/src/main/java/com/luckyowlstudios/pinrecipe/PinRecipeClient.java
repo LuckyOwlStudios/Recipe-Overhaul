@@ -1,5 +1,6 @@
 package com.luckyowlstudios.pinrecipe;
 
+import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipe;
 import com.luckyowlstudios.pinrecipe.client.BrewingRecipeBook;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookComponentAccessor;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookPageAccessor;
@@ -54,11 +55,15 @@ public final class PinRecipeClient {
 
     /** Returns true if the release was used and the screen should not see it. */
     public static boolean onMouseReleased(Screen screen, double mouseX, double mouseY, int button) {
-        return BrewingRecipeBook.mouseReleased(screen, mouseX, mouseY, button);
+        return PinnedRecipeOverlay.mouseReleased(screen, mouseX, mouseY)
+                || BrewingRecipeBook.mouseReleased(screen, mouseX, mouseY, button);
     }
 
     /** Returns true if the key press was used and the screen should not see it. */
-    public static boolean onKeyPressed(Screen screen, int keyCode, int scanCode) {
+    public static boolean onKeyPressed(Screen screen, int keyCode, int scanCode, int modifiers) {
+        if (BrewingRecipeBook.keyPressed(screen, keyCode, scanCode, modifiers)) {
+            return true;
+        }
         if (PIN_KEY.isUnbound() || !PIN_KEY.matches(keyCode, scanCode)) {
             return false;
         }
@@ -80,11 +85,20 @@ public final class PinRecipeClient {
     }
 
     private static boolean tryTogglePin(Screen screen) {
-        RecipeHolder<?> recipe = getHoveredRecipe(screen);
-        if (recipe == null) {
+        String pin = null;
+        BrewingRecipe brewing = BrewingRecipeBook.hoveredRecipe(screen);
+        if (brewing != null) {
+            pin = PinnedRecipes.brewingPin(brewing.key());
+        } else {
+            RecipeHolder<?> recipe = getHoveredRecipe(screen);
+            if (recipe != null) {
+                pin = recipe.id().toString();
+            }
+        }
+        if (pin == null) {
             return false;
         }
-        PinnedRecipes.toggle(recipe.id());
+        PinnedRecipes.toggle(pin);
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
         return true;
     }

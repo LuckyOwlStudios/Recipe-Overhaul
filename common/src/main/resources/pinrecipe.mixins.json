@@ -10,6 +10,7 @@
   "client": [
     "AbstractContainerScreenAccessor",
     "BrewingStandScreenMixin",
+    "KeyboardHandlerMixin",
     "RecipeBookComponentAccessor",
     "RecipeBookPageAccessor"
   ],
