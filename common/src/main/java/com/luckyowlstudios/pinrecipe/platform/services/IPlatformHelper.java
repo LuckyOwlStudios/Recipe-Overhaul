@@ -1,5 +1,8 @@
 package com.luckyowlstudios.pinrecipe.platform.services;
 
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerPlayer;
+
 import java.nio.file.Path;
 
 public interface IPlatformHelper {
@@ -8,4 +11,7 @@ public interface IPlatformHelper {
 
     /** The game's config directory. */
     Path getConfigDir();
+
+    /** Sends a payload to one player, if their client has the mod. */
+    void sendToPlayer(ServerPlayer player, CustomPacketPayload payload);
 }

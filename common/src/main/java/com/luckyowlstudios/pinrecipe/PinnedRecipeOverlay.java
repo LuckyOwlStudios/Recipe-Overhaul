@@ -1,5 +1,10 @@
 package com.luckyowlstudios.pinrecipe;
 
+import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipe;
+import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipes;
+import com.luckyowlstudios.pinrecipe.client.BrewingFill;
+import com.luckyowlstudios.pinrecipe.client.BrewingRecipeBook;
+import com.luckyowlstudios.pinrecipe.client.RecipeLookup;
 import com.luckyowlstudios.pinrecipe.mixin.AbstractContainerScreenAccessor;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookComponentAccessor;
 import net.minecraft.ChatFormatting;
@@ -9,7 +14,12 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
+import net.minecraft.client.gui.screens.inventory.BlastFurnaceScreen;
+import net.minecraft.client.gui.screens.inventory.BrewingStandScreen;
 import net.minecraft.client.gui.screens.inventory.CraftingScreen;
+import net.minecraft.client.gui.screens.inventory.FurnaceScreen;
+import net.minecraft.client.gui.screens.inventory.SmokerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.client.gui.screens.recipebook.RecipeUpdateListener;
@@ -22,13 +32,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Draws pinned recipes beside the inventory. Never drawn on the in-game HUD:
@@ -54,6 +65,7 @@ public final class PinnedRecipeOverlay {
 
     private static final int COLOR_BACKGROUND = 0xE0101018;
     private static final int COLOR_BORDER = 0xFF5A4A8A;
+    private static final int COLOR_BORDER_FILLABLE = 0xFFE0D070;
     private static final int COLOR_SLOT_DARK = 0xFF373737;
     private static final int COLOR_SLOT_LIGHT = 0xFFFFFFFF;
     private static final int COLOR_SLOT_FILL = 0xFF8B8B8B;
@@ -63,14 +75,56 @@ public final class PinnedRecipeOverlay {
     /** Hit boxes of the last frame's unpin buttons, so clicks can be matched to a recipe. */
     private static final List<UnpinButton> UNPIN_BUTTONS = new ArrayList<>();
     private static boolean unpinHoveredThisFrame;
+    /** Hit boxes of the last frame's panels, for click-to-fill and to keep clicks off the screen behind. */
+    private static final List<PanelHit> PANELS = new ArrayList<>();
+    /** Ingredient slots the player is missing items for: clicking one pins how to make it. */
+    private static final List<MissingSlot> MISSING_SLOTS = new ArrayList<>();
 
-    private record UnpinButton(ResourceLocation id, int x, int y, int size) {
+    private record MissingSlot(ItemStack stack, List<ItemStack> options, int x, int y) {
+        boolean contains(double mx, double my) {
+            return mx >= x && mx < x + SLOT && my >= y && my < y + SLOT;
+        }
+    }
+
+    record PanelHit(Layout layout, int x, int y, int width, int height) {
+        boolean contains(double mx, double my) {
+            return mx >= x && mx < x + width && my >= y && my < y + height;
+        }
+    }
+
+    private record UnpinButton(String pin, int x, int y, int size) {
         boolean contains(double mx, double my) {
             return mx >= x && mx < x + size && my >= y && my < y + size;
         }
     }
 
-    private record Layout(RecipeHolder<?> holder, List<Ingredient> ingredients, int gridWidth, int gridHeight, ItemStack result) {
+    /** One slot of a pinned recipe: the items it cycles through, and which items count as having it. */
+    private record SlotSpec(List<ItemStack> options, Predicate<ItemStack> test) {
+        static final SlotSpec EMPTY = new SlotSpec(List.of(), stack -> false);
+
+        static SlotSpec of(Ingredient ingredient) {
+            return ingredient.isEmpty() ? EMPTY : new SlotSpec(List.of(ingredient.getItems()), ingredient);
+        }
+
+        boolean isEmpty() {
+            return options.isEmpty();
+        }
+
+        ItemStack current() {
+            return options.isEmpty() ? ItemStack.EMPTY : options.get((int) ((Util.getMillis() / 1000L) % options.size()));
+        }
+    }
+
+    /**
+     * A pinned recipe ready to draw. Exactly one of {@code holder} (crafting, smelting, ...)
+     * and {@code brewing} is set.
+     */
+    record Layout(String pin, @Nullable RecipeHolder<?> holder, @Nullable BrewingRecipe brewing, List<SlotSpec> slots,
+                  int gridWidth, int gridHeight, ItemStack fixedResult, Component title) {
+        ItemStack result() {
+            return brewing != null ? brewing.currentOutput() : fixedResult;
+        }
+
         int height(boolean compact) {
             int height = PADDING + TITLE_HEIGHT + gridHeight * SLOT + PADDING;
             if (compact) {
@@ -86,27 +140,128 @@ public final class PinnedRecipeOverlay {
     private PinnedRecipeOverlay() {
     }
 
+    /** The inventory and every station with a recipe book: crafting table, furnace, blast furnace, smoker. */
     public static boolean shouldShow(Screen screen) {
-        return screen instanceof InventoryScreen || screen instanceof CraftingScreen;
+        return screen instanceof InventoryScreen || screen instanceof CraftingScreen
+                || screen instanceof AbstractFurnaceScreen<?> || screen instanceof BrewingStandScreen;
+    }
+
+    /** Whether this screen's grid can take the recipe, e.g. a crafting recipe in a crafting table. */
+    public static boolean canFill(Screen screen, Layout layout) {
+        if (layout.brewing() != null) {
+            return screen instanceof BrewingStandScreen;
+        }
+        Recipe<?> recipe = layout.holder().value();
+        RecipeType<?> type = recipe.getType();
+        if (screen instanceof InventoryScreen) {
+            return type == RecipeType.CRAFTING && recipe.canCraftInDimensions(2, 2);
+        }
+        if (screen instanceof CraftingScreen) {
+            return type == RecipeType.CRAFTING;
+        }
+        if (screen instanceof BlastFurnaceScreen) {
+            return type == RecipeType.BLASTING;
+        }
+        if (screen instanceof SmokerScreen) {
+            return type == RecipeType.SMOKING;
+        }
+        if (screen instanceof FurnaceScreen) {
+            return type == RecipeType.SMELTING;
+        }
+        return false;
+    }
+
+    /** Why a pin can't be filled into this screen, for its tooltip. */
+    private static Component cantFillReason(Screen screen, Layout layout) {
+        if (layout.brewing() != null) {
+            return Component.translatable("pinrecipe.overlay.use_station", Component.translatable("block.minecraft.brewing_stand"));
+        }
+        RecipeType<?> type = layout.holder().value().getType();
+        if (screen instanceof InventoryScreen && type == RecipeType.CRAFTING) {
+            return Component.translatable("pinrecipe.overlay.too_big");
+        }
+        String station = type == RecipeType.CRAFTING ? "crafting_table"
+                : type == RecipeType.SMELTING ? "furnace"
+                : type == RecipeType.BLASTING ? "blast_furnace"
+                : type == RecipeType.SMOKING ? "smoker"
+                : type == RecipeType.CAMPFIRE_COOKING ? "campfire"
+                : type == RecipeType.STONECUTTING ? "stonecutter"
+                : type == RecipeType.SMITHING ? "smithing_table"
+                : null;
+        return station == null
+                ? Component.translatable("pinrecipe.overlay.cant_fill")
+                : Component.translatable("pinrecipe.overlay.use_station", Component.translatable("block.minecraft." + station));
     }
 
     public static boolean mouseClicked(Screen screen, double mouseX, double mouseY, int button) {
-        if (button != 0 || !shouldShow(screen)) {
+        if (!shouldShow(screen)) {
             return false;
         }
-        for (UnpinButton unpin : UNPIN_BUTTONS) {
-            if (unpin.contains(mouseX, mouseY)) {
-                PinnedRecipes.unpin(unpin.id());
-                UNPIN_BUTTONS.clear();
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+        Minecraft mc = Minecraft.getInstance();
+        if (button == 0) {
+            for (UnpinButton unpin : UNPIN_BUTTONS) {
+                if (unpin.contains(mouseX, mouseY)) {
+                    PinnedRecipes.unpin(unpin.pin());
+                    UNPIN_BUTTONS.clear();
+                    PANELS.clear();
+                    playClick();
+                    return true;
+                }
+            }
+        }
+        if (button == 0) {
+            for (MissingSlot slot : MISSING_SLOTS) {
+                if (slot.contains(mouseX, mouseY)) {
+                    RecipeLookup.pinRecipeFor(slot.stack(), slot.options());
+                    return true;
+                }
+            }
+        }
+        for (PanelHit panel : PANELS) {
+            if (!panel.contains(mouseX, mouseY)) {
+                continue;
+            }
+            Layout layout = panel.layout();
+            if (button == 0 && canFill(screen, layout) && mc.gameMode != null) {
+                if (layout.brewing() != null && screen instanceof BrewingStandScreen brewingScreen) {
+                    BrewingFill.fill(brewingScreen, layout.brewing());
+                    playClick();
+                } else if (layout.holder() != null && screen instanceof AbstractContainerScreen<?> container) {
+                    // Same request the vanilla recipe book sends: the server moves the items in, or
+                    // shows a ghost of the recipe in the grid if the player is missing some.
+                    mc.gameMode.handlePlaceRecipe(container.getMenu().containerId, layout.holder(), Screen.hasShiftDown());
+                    playClick();
+                }
+            }
+            return true; // Never let a click on a pin count as a click outside the screen (which drops the held item).
+        }
+        return false;
+    }
+
+    public static boolean mouseReleased(Screen screen, double mouseX, double mouseY) {
+        if (!shouldShow(screen)) {
+            return false;
+        }
+        for (PanelHit panel : PANELS) {
+            if (panel.contains(mouseX, mouseY)) {
                 return true;
             }
         }
         return false;
     }
 
+    static List<PanelHit> panelsForTest() {
+        return List.copyOf(PANELS);
+    }
+
+    private static void playClick() {
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+    }
+
     public static void render(Screen screen, GuiGraphics graphics, int mouseX, int mouseY) {
         UNPIN_BUTTONS.clear();
+        PANELS.clear();
+        MISSING_SLOTS.clear();
         if (!shouldShow(screen)) {
             return;
         }
@@ -117,9 +272,16 @@ public final class PinnedRecipeOverlay {
         }
 
         List<Layout> layouts = new ArrayList<>();
-        for (ResourceLocation id : PinnedRecipes.get()) {
-            Optional<RecipeHolder<?>> holder = level.getRecipeManager().byKey(id);
-            holder.map(h -> layout(h, level)).ifPresent(layouts::add);
+        for (String pin : PinnedRecipes.get()) {
+            String brewingKey = PinnedRecipes.brewingKeyOf(pin);
+            if (brewingKey != null) {
+                BrewingRecipes.byKey(level, brewingKey).map(r -> brewingLayout(pin, r)).ifPresent(layouts::add);
+            } else {
+                ResourceLocation id = ResourceLocation.tryParse(pin);
+                if (id != null) {
+                    level.getRecipeManager().byKey(id).map(h -> layout(pin, h, level)).ifPresent(layouts::add);
+                }
+            }
         }
         if (layouts.isEmpty()) {
             return;
@@ -136,24 +298,60 @@ public final class PinnedRecipeOverlay {
         Font font = mc.font;
         unpinHoveredThisFrame = false;
         ItemStack tooltip = ItemStack.EMPTY;
+        PanelHit hoveredPanel = null;
+        int width = compact ? COMPACT_WIDTH : WIDE_WIDTH;
         for (Layout layout : layouts) {
-            if (y + layout.height(compact) > screen.height) {
+            int height = layout.height(compact);
+            if (y + height > screen.height) {
                 break; // No room for more pins on this screen size.
             }
-            ItemStack hovered = drawPanel(graphics, font, layout, mc.player.getInventory(), x, y, compact, mouseX, mouseY);
+            boolean fillable = canFill(screen, layout);
+            ItemStack hovered = drawPanel(graphics, font, layout, mc.player.getInventory(), x, y, compact, fillable, mouseX, mouseY);
             if (!hovered.isEmpty()) {
                 tooltip = hovered;
             }
-            y += layout.height(compact) + PANEL_SPACING;
+            PanelHit panel = new PanelHit(layout, x, y, width, height);
+            PANELS.add(panel);
+            if (panel.contains(mouseX, mouseY)) {
+                hoveredPanel = panel;
+            }
+            y += height + PANEL_SPACING;
         }
         if (!tooltip.isEmpty()) {
-            graphics.renderTooltip(font, tooltip, mouseX, mouseY);
+            List<Component> lines = new ArrayList<>(Screen.getTooltipFromItem(mc, tooltip));
+            for (MissingSlot slot : MISSING_SLOTS) {
+                if (slot.contains(mouseX, mouseY)) {
+                    lines.add(Component.translatable("pinrecipe.lookup.hint").withStyle(ChatFormatting.DARK_GRAY));
+                    break;
+                }
+            }
+            graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
         } else if (unpinHoveredThisFrame) {
             graphics.renderTooltip(font, Component.translatable("pinrecipe.overlay.unpin").withStyle(ChatFormatting.GRAY), mouseX, mouseY);
+        } else if (hoveredPanel != null) {
+            Layout layout = hoveredPanel.layout();
+            List<Component> lines;
+            if (!canFill(screen, layout)) {
+                lines = List.of(cantFillReason(screen, layout).copy().withStyle(ChatFormatting.GRAY));
+            } else if (layout.brewing() != null) {
+                lines = List.of(Component.translatable("pinrecipe.overlay.fill_brewing").withStyle(ChatFormatting.GRAY));
+            } else {
+                lines = List.of(Component.translatable("pinrecipe.overlay.fill").withStyle(ChatFormatting.GRAY),
+                        Component.translatable("pinrecipe.overlay.fill_all").withStyle(ChatFormatting.DARK_GRAY));
+            }
+            graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
         }
     }
 
-    private static Layout layout(RecipeHolder<?> holder, Level level) {
+    /** Brewing pins show the ingredient and the base bottle side by side. */
+    private static Layout brewingLayout(String pin, BrewingRecipe recipe) {
+        List<SlotSpec> slots = List.of(
+                new SlotSpec(List.of(recipe.ingredient()), recipe::ingredientMatches),
+                new SlotSpec(recipe.inputs(), recipe.inputTest()));
+        return new Layout(pin, null, recipe, slots, 2, 1, ItemStack.EMPTY, recipe.outputName());
+    }
+
+    private static Layout layout(String pin, RecipeHolder<?> holder, Level level) {
         Recipe<?> recipe = holder.value();
         List<Ingredient> ingredients = new ArrayList<>(recipe.getIngredients());
         int width;
@@ -170,7 +368,8 @@ public final class PinnedRecipeOverlay {
         width = Math.max(1, Math.min(3, width));
         height = Math.max(1, Math.min(3, height));
         ItemStack result = recipe.getResultItem(level.registryAccess());
-        return new Layout(holder, ingredients, width, height, result);
+        List<SlotSpec> slots = ingredients.stream().map(SlotSpec::of).toList();
+        return new Layout(pin, holder, null, slots, width, height, result, result.getHoverName());
     }
 
     /**
@@ -189,6 +388,11 @@ public final class PinnedRecipeOverlay {
             contentLeft = access.pinrecipe$getLeftPos();
             contentRight = contentLeft + access.pinrecipe$getImageWidth();
             top = access.pinrecipe$getTopPos();
+        }
+        int brewingBookLeft = BrewingRecipeBook.bookLeftEdge(screen);
+        if (brewingBookLeft >= 0) {
+            bookOpen = true;
+            contentLeft = Math.min(contentLeft, brewingBookLeft);
         }
         if (screen instanceof RecipeUpdateListener listener) {
             RecipeBookComponent book = listener.getRecipeBookComponent();
@@ -233,22 +437,24 @@ public final class PinnedRecipeOverlay {
 
     /** Draws one pinned recipe. Returns the stack under the mouse, if any, for the tooltip. */
     private static ItemStack drawPanel(GuiGraphics graphics, Font font, Layout layout, Inventory inventory,
-                                       int x, int y, boolean compact, int mouseX, int mouseY) {
+                                       int x, int y, boolean compact, boolean fillable, int mouseX, int mouseY) {
         int width = compact ? COMPACT_WIDTH : WIDE_WIDTH;
         int height = layout.height(compact);
+        boolean panelHovered = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
         graphics.fill(x, y, x + width, y + height, COLOR_BACKGROUND);
-        graphics.renderOutline(x, y, width, height, COLOR_BORDER);
+        // A brighter border on a pin you can click to fill into this screen.
+        graphics.renderOutline(x, y, width, height, fillable && panelHovered ? COLOR_BORDER_FILLABLE : COLOR_BORDER);
 
         // Title: the result's name, with an unpin button on the right.
         int unpinSize = 9;
         int unpinX = x + width - PADDING - unpinSize + 2;
         int unpinY = y + PADDING - 2;
         boolean unpinHovered = mouseX >= unpinX && mouseX < unpinX + unpinSize && mouseY >= unpinY && mouseY < unpinY + unpinSize;
-        Component title = layout.result().getHoverName();
+        Component title = layout.title();
         String titleText = font.plainSubstrByWidth(title.getString(), width - 2 * PADDING - unpinSize - 2);
         graphics.drawString(font, titleText, x + PADDING, y + PADDING, 0xFFFFFF, true);
         graphics.drawString(font, "x", unpinX + 2, unpinY, unpinHovered ? 0xFF5555 : 0xAAAAAA, true);
-        UNPIN_BUTTONS.add(new UnpinButton(layout.holder().id(), unpinX, unpinY, unpinSize));
+        UNPIN_BUTTONS.add(new UnpinButton(layout.pin(), unpinX, unpinY, unpinSize));
 
         ItemStack hoveredStack = ItemStack.EMPTY;
         if (unpinHovered) {
@@ -258,23 +464,23 @@ public final class PinnedRecipeOverlay {
         // Ingredient grid.
         int gridX = x + PADDING;
         int gridY = y + PADDING + TITLE_HEIGHT;
-        boolean[] missing = findMissing(layout.ingredients(), inventory);
+        boolean[] missing = findMissing(layout.slots(), inventory);
         for (int row = 0; row < layout.gridHeight(); row++) {
             for (int col = 0; col < layout.gridWidth(); col++) {
                 int index = row * layout.gridWidth() + col;
                 int sx = gridX + col * SLOT;
                 int sy = gridY + row * SLOT;
                 drawSlot(graphics, sx, sy);
-                if (index >= layout.ingredients().size()) {
+                if (index >= layout.slots().size()) {
                     continue;
                 }
-                Ingredient ingredient = layout.ingredients().get(index);
-                ItemStack stack = cycle(ingredient);
+                ItemStack stack = layout.slots().get(index).current();
                 if (stack.isEmpty()) {
                     continue;
                 }
                 if (missing[index]) {
                     graphics.fill(sx + 1, sy + 1, sx + SLOT - 1, sy + SLOT - 1, COLOR_MISSING);
+                    MISSING_SLOTS.add(new MissingSlot(stack, layout.slots().get(index).options(), sx, sy));
                 }
                 graphics.renderItem(stack, sx + 1, sy + 1);
                 if (isOver(mouseX, mouseY, sx, sy)) {
@@ -334,32 +540,23 @@ public final class PinnedRecipeOverlay {
         graphics.fill(x + 1, y + 1, x + SLOT - 1, y + SLOT - 1, COLOR_SLOT_FILL);
     }
 
-    /** Shows each matching item in turn, once per second, like the vanilla recipe book does. */
-    private static ItemStack cycle(Ingredient ingredient) {
-        ItemStack[] items = ingredient.getItems();
-        if (items.length == 0) {
-            return ItemStack.EMPTY;
-        }
-        return items[(int) ((Util.getMillis() / 1000L) % items.length)];
-    }
-
     /**
-     * Marks the ingredients the player can't cover from their inventory. Each inventory item
+     * Marks the slots the player can't cover from their inventory. Each inventory item
      * is only counted once, so a recipe needing 3 planks with only 2 in hand marks one slot.
      */
-    private static boolean[] findMissing(List<Ingredient> ingredients, Inventory inventory) {
+    private static boolean[] findMissing(List<SlotSpec> slots, Inventory inventory) {
         int size = inventory.items.size();
         int[] remaining = new int[size];
         for (int i = 0; i < size; i++) {
             remaining[i] = inventory.items.get(i).getCount();
         }
-        boolean[] missing = new boolean[ingredients.size()];
-        for (int i = 0; i < ingredients.size(); i++) {
-            Ingredient ingredient = ingredients.get(i);
-            if (ingredient.isEmpty()) {
+        boolean[] missing = new boolean[slots.size()];
+        for (int i = 0; i < slots.size(); i++) {
+            SlotSpec slot = slots.get(i);
+            if (slot.isEmpty()) {
                 continue;
             }
-            int found = findSlot(ingredient, inventory, remaining);
+            int found = findSlot(slot, inventory, remaining);
             if (found >= 0) {
                 remaining[found]--;
             } else {
@@ -369,9 +566,9 @@ public final class PinnedRecipeOverlay {
         return missing;
     }
 
-    private static int findSlot(Ingredient ingredient, Inventory inventory, int[] remaining) {
+    private static int findSlot(SlotSpec spec, Inventory inventory, int[] remaining) {
         for (int slot = 0; slot < remaining.length; slot++) {
-            if (remaining[slot] > 0 && ingredient.test(inventory.items.get(slot))) {
+            if (remaining[slot] > 0 && spec.test().test(inventory.items.get(slot))) {
                 return slot;
             }
         }

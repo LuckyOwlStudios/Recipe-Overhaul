@@ -4,9 +4,14 @@
   "package": "com.luckyowlstudios.pinrecipe.mixin",
   "refmap": "${mod_id}.refmap.json",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "ServerPlayerMixin"
+  ],
   "client": [
     "AbstractContainerScreenAccessor",
+    "BrewingStandScreenMixin",
+    "GhostIngredientAccessor",
+    "KeyboardHandlerMixin",
     "RecipeBookComponentAccessor",
     "RecipeBookPageAccessor"
   ],

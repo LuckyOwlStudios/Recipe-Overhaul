@@ -1,7 +1,10 @@
 package com.luckyowlstudios.pinrecipe.platform;
 
 import com.luckyowlstudios.pinrecipe.platform.services.IPlatformHelper;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.nio.file.Path;
 
@@ -14,5 +17,12 @@ public class NeoForgePlatformHelper implements IPlatformHelper {
     @Override
     public Path getConfigDir() {
         return FMLPaths.CONFIGDIR.get();
+    }
+
+    @Override
+    public void sendToPlayer(ServerPlayer player, CustomPacketPayload payload) {
+        if (player.connection.hasChannel(payload.type())) {
+            PacketDistributor.sendToPlayer(player, payload);
+        }
     }
 }

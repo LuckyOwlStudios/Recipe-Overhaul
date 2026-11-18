@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:paper" },
+    { "item": "minecraft:nether_wart" },
+    { "item": "minecraft:glass_bottle" }
+  ],
+  "result": {
+    "id": "pinrecipe:potion_scroll",
+    "count": 1
+  }
+}
