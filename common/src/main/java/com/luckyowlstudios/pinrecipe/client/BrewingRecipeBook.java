@@ -221,6 +221,9 @@ public final class BrewingRecipeBook {
         if (!(screen instanceof BrewingStandScreen brewing)) {
             return;
         }
+        if (!(open && isNarrow(screen))) {
+            renderGhostTooltip(brewing, graphics, mouseX, mouseY);
+        }
         if (open && isNarrow(screen)) {
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 400);
@@ -356,9 +359,56 @@ public final class BrewingRecipeBook {
             ItemStack ghost = i == INGREDIENT_SLOT ? selected.ingredient() : selected.currentInput();
             int sx = left + slot.x;
             int sy = top + slot.y;
+            // Same look as vanilla's ghost recipe: red slot, item, then a faint wash over it.
+            graphics.fill(sx, sy, sx + 16, sy + 16, 0x30FF0000);
             graphics.renderFakeItem(ghost, sx, sy);
-            // Wash the item out so it doesn't look like a real one.
-            graphics.fill(RenderType.guiGhostRecipeOverlay(), sx, sy, sx + 16, sy + 16, 0x908B8B8B);
+            graphics.fill(RenderType.guiGhostRecipeOverlay(), sx, sy, sx + 16, sy + 16, 0x30FFFFFF);
+        }
+    }
+
+    /**
+     * Clicking a ghost item looks up how to make it: a brewing recipe switches the ghost to that recipe
+     * (e.g. Awkward Potion shows Water Bottle + Nether Wart), and either way the recipe gets pinned.
+     */
+    private static boolean clickGhost(BrewingStandScreen screen, double mouseX, double mouseY) {
+        if (selected == null || (open && isNarrow(screen)) || !screen.getMenu().getCarried().isEmpty()) {
+            return false;
+        }
+        List<Slot> slots = screen.getMenu().slots;
+        int left = access(screen).pinrecipe$getLeftPos();
+        int top = access(screen).pinrecipe$getTopPos();
+        for (int i = 0; i <= INGREDIENT_SLOT && i < slots.size(); i++) {
+            Slot slot = slots.get(i);
+            if (slot.hasItem() || !inside(mouseX, mouseY, left + slot.x, top + slot.y, 16, 16)) {
+                continue;
+            }
+            ItemStack ghost = i == INGREDIENT_SLOT ? selected.ingredient() : selected.currentInput();
+            BrewingRecipe brewing = RecipeLookup.findBrewing(ghost);
+            if (RecipeLookup.pinRecipeFor(ghost) && brewing != null) {
+                selected = brewing;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /** Hovering a ghost item names it, like vanilla's ghost recipes in the crafting grid. */
+    private static void renderGhostTooltip(BrewingStandScreen screen, GuiGraphics graphics, int mouseX, int mouseY) {
+        if (selected == null) {
+            return;
+        }
+        List<Slot> slots = screen.getMenu().slots;
+        int left = access(screen).pinrecipe$getLeftPos();
+        int top = access(screen).pinrecipe$getTopPos();
+        for (int i = 0; i <= INGREDIENT_SLOT && i < slots.size(); i++) {
+            Slot slot = slots.get(i);
+            if (!slot.hasItem() && inside(mouseX, mouseY, left + slot.x, top + slot.y, 16, 16)) {
+                ItemStack ghost = i == INGREDIENT_SLOT ? selected.ingredient() : selected.currentInput();
+                List<Component> lines = new ArrayList<>(Screen.getTooltipFromItem(Minecraft.getInstance(), ghost));
+                lines.add(Component.translatable("pinrecipe.lookup.hint").withStyle(ChatFormatting.DARK_GRAY));
+                graphics.renderComponentTooltip(Minecraft.getInstance().font, lines, mouseX, mouseY);
+                return;
+            }
         }
     }
 
@@ -386,6 +436,9 @@ public final class BrewingRecipeBook {
     public static boolean mouseClicked(Screen screen, double mouseX, double mouseY, int button) {
         if (!(screen instanceof BrewingStandScreen brewing)) {
             return false;
+        }
+        if (button == 0 && clickGhost(brewing, mouseX, mouseY)) {
+            return true;
         }
         if (button == 0 && inside(mouseX, mouseY, buttonX(brewing), buttonY(brewing), BUTTON_WIDTH, BUTTON_HEIGHT)) {
             open = !open;

@@ -13,6 +13,7 @@ import net.neoforged.neoforge.common.NeoForge;
 @Mod(value = Constants.MOD_ID, dist = Dist.CLIENT)
 public class PinRecipeNeoForgeClient {
     public PinRecipeNeoForgeClient(IEventBus modBus) {
+        PinRecipeClient.init();
         modBus.addListener(RegisterKeyMappingsEvent.class, event -> event.register(PinRecipeClient.PIN_KEY));
 
         NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, event -> ClientBrewingKnowledge.clear());

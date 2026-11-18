@@ -17,7 +17,6 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
-import java.util.Optional;
 
 /** Using it teaches the player a random brewing recipe they don't know yet. */
 public class PotionScrollItem extends Item {
@@ -31,7 +30,9 @@ public class PotionScrollItem extends Item {
         if (!(player instanceof ServerPlayer serverPlayer)) {
             return InteractionResultHolder.success(stack);
         }
-        Optional<BrewingRecipe> learned = BrewingKnowledge.unlockRandom(serverPlayer);
+        // Sneak-use reads the whole stack (one recipe per scroll), stopping once every recipe is known.
+        int wanted = player.isShiftKeyDown() ? stack.getCount() : 1;
+        List<BrewingRecipe> learned = BrewingKnowledge.unlockRandom(serverPlayer, wanted);
         if (learned.isEmpty()) {
             serverPlayer.displayClientMessage(
                     Component.translatable("item.pinrecipe.potion_scroll.all_known").withStyle(ChatFormatting.GRAY), true);
@@ -41,15 +42,14 @@ public class PotionScrollItem extends Item {
                 SoundEvents.BOOK_PAGE_TURN, SoundSource.PLAYERS, 1.0F, 1.0F);
         level.playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.BREWING_STAND_BREW, SoundSource.PLAYERS, 0.6F, 1.2F);
-        serverPlayer.sendSystemMessage(Component.translatable("item.pinrecipe.potion_scroll.learned",
-                learned.get().describe().copy().withStyle(ChatFormatting.LIGHT_PURPLE)));
-        player.awardStat(Stats.ITEM_USED.get(this));
-        stack.consume(1, player);
+        player.awardStat(Stats.ITEM_USED.get(this), learned.size());
+        stack.consume(learned.size(), player);
         return InteractionResultHolder.consume(stack);
     }
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.pinrecipe.potion_scroll.tooltip").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.pinrecipe.potion_scroll.tooltip_bulk").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

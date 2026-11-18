@@ -13,10 +13,11 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 public class PinRecipeFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
+        PinRecipeClient.init();
         KeyBindingHelper.registerKeyBinding(PinRecipeClient.PIN_KEY);
 
         ClientPlayNetworking.registerGlobalReceiver(SyncKnownBrewsPayload.TYPE,
-                (payload, context) -> ClientBrewingKnowledge.set(payload.keys()));
+                (payload, context) -> ClientBrewingKnowledge.handle(payload));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientBrewingKnowledge.clear());
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {

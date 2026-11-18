@@ -4,6 +4,7 @@ import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipe;
 import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipes;
 import com.luckyowlstudios.pinrecipe.client.BrewingFill;
 import com.luckyowlstudios.pinrecipe.client.BrewingRecipeBook;
+import com.luckyowlstudios.pinrecipe.client.RecipeLookup;
 import com.luckyowlstudios.pinrecipe.mixin.AbstractContainerScreenAccessor;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookComponentAccessor;
 import net.minecraft.ChatFormatting;
@@ -76,6 +77,14 @@ public final class PinnedRecipeOverlay {
     private static boolean unpinHoveredThisFrame;
     /** Hit boxes of the last frame's panels, for click-to-fill and to keep clicks off the screen behind. */
     private static final List<PanelHit> PANELS = new ArrayList<>();
+    /** Ingredient slots the player is missing items for: clicking one pins how to make it. */
+    private static final List<MissingSlot> MISSING_SLOTS = new ArrayList<>();
+
+    private record MissingSlot(ItemStack stack, List<ItemStack> options, int x, int y) {
+        boolean contains(double mx, double my) {
+            return mx >= x && mx < x + SLOT && my >= y && my < y + SLOT;
+        }
+    }
 
     record PanelHit(Layout layout, int x, int y, int width, int height) {
         boolean contains(double mx, double my) {
@@ -200,6 +209,14 @@ public final class PinnedRecipeOverlay {
                 }
             }
         }
+        if (button == 0) {
+            for (MissingSlot slot : MISSING_SLOTS) {
+                if (slot.contains(mouseX, mouseY)) {
+                    RecipeLookup.pinRecipeFor(slot.stack(), slot.options());
+                    return true;
+                }
+            }
+        }
         for (PanelHit panel : PANELS) {
             if (!panel.contains(mouseX, mouseY)) {
                 continue;
@@ -244,6 +261,7 @@ public final class PinnedRecipeOverlay {
     public static void render(Screen screen, GuiGraphics graphics, int mouseX, int mouseY) {
         UNPIN_BUTTONS.clear();
         PANELS.clear();
+        MISSING_SLOTS.clear();
         if (!shouldShow(screen)) {
             return;
         }
@@ -300,7 +318,14 @@ public final class PinnedRecipeOverlay {
             y += height + PANEL_SPACING;
         }
         if (!tooltip.isEmpty()) {
-            graphics.renderTooltip(font, tooltip, mouseX, mouseY);
+            List<Component> lines = new ArrayList<>(Screen.getTooltipFromItem(mc, tooltip));
+            for (MissingSlot slot : MISSING_SLOTS) {
+                if (slot.contains(mouseX, mouseY)) {
+                    lines.add(Component.translatable("pinrecipe.lookup.hint").withStyle(ChatFormatting.DARK_GRAY));
+                    break;
+                }
+            }
+            graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
         } else if (unpinHoveredThisFrame) {
             graphics.renderTooltip(font, Component.translatable("pinrecipe.overlay.unpin").withStyle(ChatFormatting.GRAY), mouseX, mouseY);
         } else if (hoveredPanel != null) {
@@ -455,6 +480,7 @@ public final class PinnedRecipeOverlay {
                 }
                 if (missing[index]) {
                     graphics.fill(sx + 1, sy + 1, sx + SLOT - 1, sy + SLOT - 1, COLOR_MISSING);
+                    MISSING_SLOTS.add(new MissingSlot(stack, layout.slots().get(index).options(), sx, sy));
                 }
                 graphics.renderItem(stack, sx + 1, sy + 1);
                 if (isOver(mouseX, mouseY, sx, sy)) {

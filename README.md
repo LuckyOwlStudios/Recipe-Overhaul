@@ -16,6 +16,9 @@ Pinned recipes show up beside your inventory whenever it's open, and never on th
    the 2x2 grid (if they fit) or a crafting table; smelting, blasting and smoking recipes fill their furnace;
    brewing recipes fill the brewing stand.
 
+- Click a red (missing) ingredient on a pin, or a ghost item in the crafting grid or brewing stand, to pin the
+  recipe for that ingredient if you know it. Hovering it says so. A ghost Awkward Potion in the brewing stand also
+  switches the ghost to Water Bottle + Nether Wart. For "any planks" slots it picks the kind you already have.
 - Up to 4 recipes can be pinned; pinning a 5th drops the oldest.
 - The key can be changed in Options → Controls → Key Binds → Pin Recipe (it can also be bound to a mouse button).
 - Pins are saved to `config/pinrecipe.json`, so they survive restarts.
@@ -35,13 +38,17 @@ Pinned recipes show up beside your inventory whenever it's open, and never on th
   brew right now.
 - Click a recipe to move its bottles and ingredient into the stand. Anything you're missing shows as a faded
   "ghost" item in the stand's empty slots.
+- Hover a ghost item to see its name, like vanilla's crafting ghosts.
 - Hover a recipe and press **B** to pin it, the same as in the vanilla recipe book.
 
 ### Potion Scroll
 
 - Craft one from **paper + nether wart + glass bottle** (shapeless). The recipe unlocks once you pick up nether wart.
 - Witches drop one 10% of the time when killed by a player, plus 5% per level of Looting (25% with Looting III).
-- Use it to learn a random brewing recipe you don't know yet. It's used up, unless you already know every recipe.
+- Use it to learn a random brewing recipe you don't know yet. A "New Brewing Recipe!" toast shows the potion.
+  It's used up, unless you already know every recipe.
+- Sneak while using it to read the whole stack: one recipe per scroll, with a single toast for the lot. If you
+  run out of recipes to learn, the leftover scrolls stay in your hand.
 - Unlocks only fill the book: you can still brew anything without unlocking it, like vanilla's recipe book.
 - Unlocks are saved per player and kept through death.
 - Operators can use `/brewbook unlockall` and `/brewbook reset` to test.

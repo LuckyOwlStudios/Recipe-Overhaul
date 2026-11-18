@@ -2,6 +2,7 @@ package com.luckyowlstudios.pinrecipe;
 
 import com.luckyowlstudios.pinrecipe.brewing.BrewingRecipe;
 import com.luckyowlstudios.pinrecipe.client.BrewingRecipeBook;
+import com.luckyowlstudios.pinrecipe.client.GhostRecipeClicks;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookComponentAccessor;
 import com.luckyowlstudios.pinrecipe.mixin.RecipeBookPageAccessor;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -36,6 +37,12 @@ public final class PinRecipeClient {
     private static Screen lastInitScreen;
 
     private PinRecipeClient() {
+    }
+
+    /** Called once from each loader's client entrypoint. */
+    public static void init() {
+        com.luckyowlstudios.pinrecipe.brewing.ClientBrewingKnowledge.learnedListener =
+                com.luckyowlstudios.pinrecipe.client.BrewingLearnedToast::show;
     }
 
     /** Called after a screen renders. Draws the pinned recipes on the inventory screen only. */
@@ -76,6 +83,9 @@ public final class PinRecipeClient {
             return true;
         }
         if (BrewingRecipeBook.mouseClicked(screen, mouseX, mouseY, button)) {
+            return true;
+        }
+        if (GhostRecipeClicks.mouseClicked(screen, mouseX, mouseY, button)) {
             return true;
         }
         if (!PIN_KEY.isUnbound() && PIN_KEY.matchesMouse(button)) {

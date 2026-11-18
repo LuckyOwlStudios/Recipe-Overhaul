@@ -35,7 +35,7 @@ public class PinRecipeNeoForge {
 
         modBus.addListener(RegisterPayloadHandlersEvent.class, event -> event.registrar("1")
                 .playToClient(SyncKnownBrewsPayload.TYPE, SyncKnownBrewsPayload.STREAM_CODEC,
-                        (payload, context) -> ClientBrewingKnowledge.set(payload.keys())));
+                        (payload, context) -> ClientBrewingKnowledge.handle(payload)));
 
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, event -> {
             if (event.getEntity() instanceof ServerPlayer player) {

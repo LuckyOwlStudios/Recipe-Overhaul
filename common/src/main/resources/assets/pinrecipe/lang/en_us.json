@@ -8,12 +8,12 @@
   "pinrecipe.overlay.too_big": "Too big for the 2x2 grid: use a Crafting Table",
   "pinrecipe.overlay.use_station": "Open a %s to fill this recipe",
   "pinrecipe.overlay.cant_fill": "Can't be filled here",
-
+  "pinrecipe.lookup.hint": "Click to pin its recipe",
+  "pinrecipe.lookup.pinned": "Pinned the recipe for %s",
+  "pinrecipe.lookup.unknown": "You don't know a recipe for %s",
   "item.pinrecipe.potion_scroll": "Potion Scroll",
   "item.pinrecipe.potion_scroll.tooltip": "Use to learn a random brewing recipe",
-  "item.pinrecipe.potion_scroll.learned": "You learned a brewing recipe: %s",
   "item.pinrecipe.potion_scroll.all_known": "You already know every brewing recipe",
-
   "pinrecipe.brewing.showing_brewable": "Showing Brewable",
   "pinrecipe.brewing.empty": "Read a Potion Scroll to learn brewing recipes.",
   "pinrecipe.brewing.recipe": "%s (%s + %s)",
@@ -24,7 +24,10 @@
   "pinrecipe.brewing.click_fill": "Click to fill the brewing stand",
   "pinrecipe.brewing.press_pin": "Press %s to pin",
   "pinrecipe.brewing.press_unpin": "Press %s to unpin",
-
   "commands.pinrecipe.brewbook.unlockall": "Unlocked %s brewing recipes",
-  "commands.pinrecipe.brewbook.reset": "Forgot all brewing recipes"
+  "commands.pinrecipe.brewbook.reset": "Forgot all brewing recipes",
+  "item.pinrecipe.potion_scroll.tooltip_bulk": "Sneak while using to read the whole stack",
+  "pinrecipe.toast.learned.title": "New Brewing Recipe!",
+  "pinrecipe.toast.learned_many.title": "%s Brewing Recipes!",
+  "pinrecipe.toast.learned_many.description": "Check the brewing stand book"
 }

@@ -85,6 +85,17 @@ public final class PinnedRecipes {
         return pinned;
     }
 
+    /** Pins the recipe (moving it to the top if it's already pinned). */
+    public static void pin(String id) {
+        ensureLoaded();
+        PINS.remove(id);
+        PINS.add(0, id);
+        while (PINS.size() > MAX_PINS) {
+            PINS.remove(PINS.size() - 1);
+        }
+        save();
+    }
+
     public static void unpin(String id) {
         ensureLoaded();
         if (PINS.remove(id)) {

@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /** Server side: which brewing recipes each player has unlocked, saved with the player's data. */
@@ -18,8 +17,11 @@ public final class BrewingKnowledge {
         return ((KnownBrewsHolder) player).pinrecipe$getKnownBrews();
     }
 
-    /** Unlocks one random recipe the player doesn't know yet. Empty if they already know them all. */
-    public static Optional<BrewingRecipe> unlockRandom(ServerPlayer player) {
+    /**
+     * Unlocks up to {@code count} random recipes the player doesn't know yet and tells the client which ones,
+     * so it can show a toast. Returns the recipes learned; empty if they already know them all.
+     */
+    public static List<BrewingRecipe> unlockRandom(ServerPlayer player, int count) {
         Set<String> known = known(player);
         List<BrewingRecipe> locked = new ArrayList<>();
         for (BrewingRecipe recipe : BrewingRecipes.all(player.level())) {
@@ -27,13 +29,17 @@ public final class BrewingKnowledge {
                 locked.add(recipe);
             }
         }
-        if (locked.isEmpty()) {
-            return Optional.empty();
+        List<BrewingRecipe> learned = new ArrayList<>();
+        while (learned.size() < count && !locked.isEmpty()) {
+            BrewingRecipe recipe = locked.remove(player.getRandom().nextInt(locked.size()));
+            known.add(recipe.key());
+            learned.add(recipe);
         }
-        BrewingRecipe recipe = locked.get(player.getRandom().nextInt(locked.size()));
-        known.add(recipe.key());
-        sync(player);
-        return Optional.of(recipe);
+        if (!learned.isEmpty()) {
+            Services.PLATFORM.sendToPlayer(player, new SyncKnownBrewsPayload(List.copyOf(known),
+                    learned.stream().map(BrewingRecipe::key).toList()));
+        }
+        return learned;
     }
 
     public static int unlockAll(ServerPlayer player) {
@@ -50,6 +56,6 @@ public final class BrewingKnowledge {
     }
 
     public static void sync(ServerPlayer player) {
-        Services.PLATFORM.sendToPlayer(player, new SyncKnownBrewsPayload(List.copyOf(known(player))));
+        Services.PLATFORM.sendToPlayer(player, new SyncKnownBrewsPayload(List.copyOf(known(player)), List.of()));
     }
 }
