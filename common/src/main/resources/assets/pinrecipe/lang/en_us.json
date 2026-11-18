@@ -21,6 +21,7 @@
   "pinrecipe.brewing.strong": "%s II",
   "pinrecipe.brewing.base": "Base: %s",
   "pinrecipe.brewing.ingredient": "Ingredient: %s",
+  "pinrecipe.brewing.ingredient_any": "Ingredient, any of:",
   "pinrecipe.brewing.click_fill": "Click to fill the brewing stand",
   "pinrecipe.brewing.press_pin": "Press %s to pin",
   "pinrecipe.brewing.press_unpin": "Press %s to unpin",
@@ -29,5 +30,7 @@
   "item.pinrecipe.potion_scroll.tooltip_bulk": "Sneak while using to read the whole stack",
   "pinrecipe.toast.learned.title": "New Brewing Recipe!",
   "pinrecipe.toast.learned_many.title": "%s Brewing Recipes!",
-  "pinrecipe.toast.learned_many.description": "Check the brewing stand book"
+  "pinrecipe.toast.learned_many.description": "Check the brewing stand book",
+  "advancements.pinrecipe.learn_all_brewing.title": "Master Alchemist",
+  "advancements.pinrecipe.learn_all_brewing.description": "Learn every brewing recipe"
 }

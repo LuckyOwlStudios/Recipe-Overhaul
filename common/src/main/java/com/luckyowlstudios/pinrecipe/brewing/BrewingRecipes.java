@@ -61,9 +61,12 @@ public final class BrewingRecipes {
 
         Map<String, BrewingRecipe> recipes = new LinkedHashMap<>();
 
-        // Potion recipes: one entry per base potion + ingredient, shown as drinkable potions.
+        // Potion recipes: one entry per base potion + result. Ingredients that brew the same result from the same
+        // potion share an entry (e.g. Water Bottle + any of 12 items makes a Mundane Potion).
         for (Holder.Reference<Potion> potion : potions) {
             ItemStack input = PotionContents.createItemStack(Items.POTION, potion);
+            Map<String, List<ItemStack>> ingredientsByResult = new LinkedHashMap<>();
+            Map<String, ItemStack> outputsByResult = new LinkedHashMap<>();
             for (ItemStack ingredient : ingredients) {
                 if (!brewing.hasMix(input, ingredient)) {
                     continue;
@@ -75,11 +78,23 @@ public final class BrewingRecipes {
                 if (!output.is(Items.POTION) && brewing.isContainerIngredient(ingredient)) {
                     continue; // Gunpowder and friends are listed once below instead of once per potion.
                 }
-                String key = "potion/" + potion.key().location() + "/" + id(ingredient.getItem());
-                if (!output.is(Items.POTION)) {
-                    key += "/" + id(output.getItem());
+                String result = id(output.getItem()) + "|" + output.getComponentsPatch();
+                ingredientsByResult.computeIfAbsent(result, r -> new ArrayList<>()).add(ingredient);
+                outputsByResult.putIfAbsent(result, output);
+            }
+            for (Map.Entry<String, List<ItemStack>> entry : ingredientsByResult.entrySet()) {
+                List<ItemStack> group = entry.getValue();
+                ItemStack output = outputsByResult.get(entry.getKey());
+                String key;
+                if (group.size() == 1) {
+                    key = "potion/" + potion.key().location() + "/" + id(group.get(0).getItem());
+                    if (!output.is(Items.POTION)) {
+                        key += "/" + id(output.getItem());
+                    }
+                } else {
+                    key = "potion/" + potion.key().location() + "/=" + resultId(output);
                 }
-                recipes.putIfAbsent(key, new BrewingRecipe(key, List.of(input), ingredient, List.of(output),
+                recipes.putIfAbsent(key, new BrewingRecipe(key, List.of(input), List.copyOf(group), List.of(output),
                         potionName(input), potionName(output), stack -> hasPotion(stack, potion)));
             }
         }
@@ -110,7 +125,7 @@ public final class BrewingRecipes {
                     continue;
                 }
                 String key = "container/" + id(container) + "/" + id(ingredient.getItem());
-                recipes.putIfAbsent(key, new BrewingRecipe(key, List.copyOf(inputs), ingredient, List.copyOf(outputs),
+                recipes.putIfAbsent(key, new BrewingRecipe(key, List.copyOf(inputs), List.of(ingredient), List.copyOf(outputs),
                         container.getDescription(), resultItem.getDescription(),
                         stack -> stack.is(container) && stack.has(DataComponents.POTION_CONTENTS)));
             }
@@ -144,6 +159,16 @@ public final class BrewingRecipes {
         }
         PotionContents contents = stack.get(DataComponents.POTION_CONTENTS);
         return contents != null && contents.is(potion);
+    }
+
+    /** e.g. "minecraft:mundane" for a Mundane Potion, or the item id for anything else. */
+    private static String resultId(ItemStack output) {
+        PotionContents contents = output.get(DataComponents.POTION_CONTENTS);
+        if (contents != null && contents.potion().isPresent()) {
+            String potion = contents.potion().get().unwrapKey().map(k -> k.location().toString()).orElse("?");
+            return output.is(Items.POTION) ? potion : id(output.getItem()) + "/" + potion;
+        }
+        return id(output.getItem()).toString();
     }
 
     private static ResourceLocation id(Item item) {
